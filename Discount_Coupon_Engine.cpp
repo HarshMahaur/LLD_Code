@@ -8,14 +8,14 @@ string category;
 double price;
 };
 class cartItem{
-    product* d;
+    product* p;
     int quantity;
-dublic:
-    cartItem(droduct* dd,int quant){
-        this->d = dd;
+public:
+    cartItem(product* dd,int quant){
+        this->p = dd;
         quantity= quant;
     }
-    double get_drice(){
+    double get_price(){
         return p->price*quantity;
     }
 };
