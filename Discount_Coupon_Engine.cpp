@@ -30,7 +30,8 @@ public:
         for(auto c: item){
             total+=c->get_price();
         }
-        return total;
+        originalTotal= total;
+        return originalTotal;
     }
     double get_finalTotal(){
         return finalTotal;
@@ -50,6 +51,11 @@ public:
     }
 };
 
+// stratergy design pattern implimentation in the discount stratergy;
+class DiscountStratergy(){
+        vitrual calculate(double amt);
+};
+class flatDiscount 
 
 int main(){
     
