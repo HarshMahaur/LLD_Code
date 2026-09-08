@@ -79,11 +79,11 @@ public:
     }
     
 };
-class PercenWithCapDiscountStrategy : public DiscountStrategy{
+class PercenWithUpperCapDiscountStrategy : public DiscountStrategy{
     double percent{0};
     double cap{0}; // this is the max discount price can be applied on the product.
 public:
-    PercenWithCapDiscountStrategy(double Per,double Cp){
+    PercenWithUpperCapDiscountStrategy(double Per,double Cp){
         percent = Per ;
         cap = Cp;
     }
@@ -101,9 +101,68 @@ public:
     }
     
 };
+class PercenWithCapDiscountStrategy : public DiscountStrategy{
+    double percent{0};
+    double cap{0}; // this is the min amount has to spend in order to apply coupon.
+public:
+    PercenWithCapDiscountStrategy(double Per,double Cp){
+        percent = Per ;
+        cap = Cp;
+    }
+    double calculate(double amount) override {
+        if(amount<cap){
+            std::cout<< "this coupon can not be applied. need at least "<<cap<<" amount to be applied" <<std::endl;
+            return amount;
+        }
+        return amount - ((amount*percent)/100);
+
+    }
+    
+};
 
 // now the coupon class that will serve as the bridge bw the discount strat and cart
 class coupon{
+    coupon* next;
+public:
+    coupon(){
+        next = nullptr;
+    } 
+    virtual ~coupon(){
+        if(next){
+            delete next;
+        }
+    }
+    coupon* get_next(){
+        return next;
+    }
+    virtual double getDiscount(cart* c)=0;
+    virtual bool isApplicable(cart* c)=0;
+    virtual bool isCimbinable(cart* c){
+        return true;
+    }
+    virtual string name()=0;
+    void applyDiscount(cart* c){
+        if(isApplicable(c)){
+            double discount = getDiscount(c);
+
+        }
+
+    }
+
+};
+
+class BankingCoupon : public coupon{
+    string bank;
+    double minSpend,percent,off; // this is where the persent with cap will be used.
+
+};
+class loyaltyDiscount : public coupon{
+
+};
+class BulkPurchaseCoupon : public coupon{
+
+};
+class SeasonalCoupon : public coupon{
 
 };
 
