@@ -2,10 +2,24 @@
 using namespace std;
 
 class product{
+    string name;
+    string category;
+    double price;
 public:
-string name;
-string category;
-double price;
+    product(string n,string cat, double p){
+        name = name;
+        category= cat;
+        price= p;
+    }
+    string get_name(){
+        return name;
+    }
+    string get_category(){
+        return category;
+    }
+    double get_price(){
+        return price;
+    }
 };
 class cartItem{
     product* p;
@@ -16,7 +30,10 @@ public:
         quantity= quant;
     }
     double get_price(){
-        return p->price*quantity;
+        return p->get_price()*quantity;
+    }
+    product* get_product(){
+        return p;
     }
 };
 class cart{
@@ -24,7 +41,11 @@ class cart{
     bool loyalityMember;
     double originalTotal;
     double finalTotal;
+    string payment_bank; // added later.
 public:
+    string get_payment_bank(){
+        return payment_bank;
+    }
     double get_originalTotal(){
         double total{0};
         for(auto c: item){
@@ -36,9 +57,16 @@ public:
     double get_finalTotal(){
         return finalTotal;
     }
+    bool get_loyality_Member(){
+        return loyalityMember;
+    }
     void addPDT(product* p,int q){
         cartItem* newcart = new cartItem(p,q);
         item.push_back(newcart); 
+    }
+
+    vector<cartItem*> get_iten_list(){
+        return item;
     }
 
     void applyDiscount(double amt){ // this amt the final amt that we will get after applying the coupons on th original amount
@@ -50,7 +78,7 @@ public:
         }
     }
 };
-
+//------------------------------------------------------------------
 // stratergy design pattern implimentation in the discount stratergy;
 class DiscountStrategy{
     public: //Must be public so derived classes can override it
@@ -154,16 +182,60 @@ public:
 class BankingCoupon : public coupon{
     string bank;
     double minSpend,percent,off; // this is where the persent with cap will be used.
-
+    DiscountStrategy* ds;
+public:
+    bool isApplicable(cart* c) override{
+        return (c->get_payment_bank()==bank);
+    }
+    
+    
 };
 class loyaltyDiscount : public coupon{
-
+    double percent{0};
+    
+    DiscountStrategy* ds;
+public:
+    bool isApplicable(cart* c) override{
+        return c->get_loyality_Member();
+    }
+    
+    
+    
 };
 class BulkPurchaseCoupon : public coupon{
-
+    double threshold{0};
+    double flatoff{0};
+    DiscountStrategy* ds;
+public:
+    bool isApplicable(cart* c){
+        double amt = c->get_originalTotal();
+        return amt>=threshold;
+    }
+    
 };
 class SeasonalCoupon : public coupon{
+    string catagory;
+    double percent;
+    DiscountStrategy* ds;
+public:
+    bool isApplicable(cart* c){
+        for(cartItem* item : c->get_iten_list()){
+            if(item->get_product()->get_category()==catagory){
+                return true;
+            }
+        }
+        return false;
+    }
 
+};
+
+// ENUM class;
+enum class S_type{ // enum class for the strategies
+    FLAT,
+    PERCENT,
+    DISOCUNT,
+    PERWITHUPPERCAP,
+    PERWITHCAP
 };
 
 int main(){
