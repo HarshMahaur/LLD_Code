@@ -80,6 +80,9 @@ public:
 };
 //------------------------------------------------------------------
 // stratergy design pattern implimentation in the discount stratergy;
+
+// just realize that the base amount passed to the calculate ovveride function has to be under 32 bit.
+// should have done - (amount/100)*percent.
 class DiscountStrategy{
     public: //Must be public so derived classes can override it
         virtual ~DiscountStrategy() = default; // recommended by the chat 
@@ -92,7 +95,8 @@ public:
         DisocuntAmt = Dis;
     }
     double calculate(double amount) override  {
-        return amount - DisocuntAmt;
+        // return amount - DisocuntAmt; // 50 -100 = -50 (wrong) + have to return the amt that needed to be deducted.
+        return min(DisocuntAmt,amount); // this amount it the base amount;
     }
     
 };
@@ -103,28 +107,28 @@ public:
         Percent = per;
     }
     double calculate(double amount) override {
-        return amount - (amount*Percent)/100;
+        // return amount - (amount*Percent)/100; // this will not return the tota amount ; it will return the amount thet is needed to be deducted from the base amt.
+        return (amount*Percent)/100;
     }
     
 };
 class PercenWithUpperCapDiscountStrategy : public DiscountStrategy{
     double percent{0};
-    double cap{0}; // this is the max discount price can be applied on the product.
+    double Amtcap{0}; // this is the max discount price can be applied on the product.
 public:
-    PercenWithUpperCapDiscountStrategy(double Per,double Cp){
+    PercenWithUpperCapDiscountStrategy(double Per,double Cp){ // my class that set treashold for the baseamount for coupon to be applicable
         percent = Per ;
-        cap = Cp;
+        Amtcap = Cp;
     }
     double calculate(double amount) override {
         double off{0};
-        if(((amount*percent)/100)>cap){
-            off = cap;
+        if(amount<Amtcap){
+            std::cout<< "you are short on base amount you need item of Rs."<<Amtcap-amount<<" in your cart for this coupon to be applicable" <<std::endl;
+            return 0;
         }
-        else{
-            off = ((amount*percent)/100);
-        }
+        return ((amount*percent)/100);
         
-        return amount - off;
+
 
     }
     
@@ -138,11 +142,12 @@ public:
         cap = Cp;
     }
     double calculate(double amount) override {
-        if(amount<cap){
+        double discount = (amount*percent)/100;
+        if(cap<discount){
             std::cout<< "this coupon can not be applied. need at least "<<cap<<" amount to be applied" <<std::endl;
-            return amount;
+            return cap;
         }
-        return amount - ((amount*percent)/100);
+        return discount;
 
     }
     
@@ -237,6 +242,21 @@ enum class S_type{ // enum class for the strategies
     PERWITHUPPERCAP,
     PERWITHCAP
 };
+// coupon manager
+class CouponManager{ // will have 1..* relation with coupon class.
+    coupon* head;
+    //mutex mtx; // for thread safe things.
+public:
+    void registerCoupon(coupon* c){ 
+
+
+
+
+    }
+
+};
+
+// disocunt stratergy manager 
 
 int main(){
     
