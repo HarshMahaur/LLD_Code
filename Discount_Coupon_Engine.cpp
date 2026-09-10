@@ -41,7 +41,7 @@ class cart{
     vector<cartItem*> item;
     bool loyalityMember;
     double originalTotal;
-    double finalTotal;
+    double finalTotal; // like current total;
     string payment_bank; // added later.
 public:
     string get_payment_bank(){
@@ -166,6 +166,9 @@ public:
             delete next;
         }
     }
+    void set_next(coupon* nxt){
+        next = nxt;
+    }
     coupon* get_next(){
         return next;
     }
@@ -247,24 +250,94 @@ enum class S_type{ // enum class for the strategies
 class CouponManager{ // will have 1..* relation with coupon class.
     coupon* head;
     static CouponManager* instance;
-    mutable mutex mtx; 
+    // mutable mutex mtx; // shows error of mutex is undefined even to the header has been added.
+    CouponManager(){
+        head = nullptr;
+    }
 
     //mutex mtx; // for thread safe things.
 public:
-    void registerCoupon(coupon* c){ 
-        
+    void registerCoupon(coupon* c){ // add the ocupon to the list of coupons
+        // lock_guard<mutex> lock(mtx);
+        if(!head){
+            head = c;
+        }
+        else{
+            coupon* curr = head;
+            while(curr->get_next()){
+                curr = curr->get_next();
+            }
+            curr->set_next(c);
+        }
 
+    }
+    vector<string> isApplicable(cart* crt){
+        // lock_guard<mutex> lock(mtx);
+        vector<string> res;
+        coupon* curr = head;
+        while(curr){
+            if(curr->isApplicable(crt)){
+                res.push_back(curr->name());
+            }
+            curr=curr->get_next();
+        }
+        return res;
 
+    }
+    double Apply_All(cart* c){
+        if(head){
+            head->applyDiscount();
 
+        }
+        return c->get_finalTotal();
 
     }
 
 };
 
+CouponManager* CouponManager::instance = nullptr;
 // disocunt stratergy manager 
 
 int main(){
-    
+    CouponManager* mgr = CouponManager::getInstance();
+    mgr->registerCoupon(new SeasonalOffer(10, "Clothing"));
+    mgr->registerCoupon(new LoyaltyDiscount(5));
+    mgr->registerCoupon(new BulkPurchaseDiscount(1000, 100));
+    mgr->registerCoupon(new BankingCoupon("ABC", 2000, 15, 500));
+
+    Product* p1 = new Product("Winter Jacket", "Clothing", 1000);
+    Product* p2 = new Product("Smartphone", "Electronics", 20000);
+    Product* p3 = new Product("Jeans", "Clothing", 1000);
+    Product* p4 = new Product("Headphones", "Electronics", 2000);
+
+    Cart* cart = new Cart();
+    cart->addProduct(p1, 1);
+    cart->addProduct(p2, 1);
+    cart->addProduct(p3, 2);
+    cart->addProduct(p4, 1);
+    cart->setLoyaltyMember(true);
+    cart->setPaymentBank("ABC");
+
+    cout << "Original Cart Total: " << cart->getOriginalTotal() << " Rs" << endl;
+
+
+
+    vector<string> applicable = mgr->getApplicable(cart);
+    cout << "Applicable Coupons:" << endl;
+    for (string name : applicable) {
+        cout << " - " << name << endl;
+    }
+
+    double finalTotal = mgr->applyAll(cart);
+    cout << "Final Cart Total after discounts: " << finalTotal << " Rs" << endl;
+
+    // Cleanup code
+    delete p1;
+    delete p2;
+    delete p3;
+    delete p4;
+    delete cart;
+
 
 
 
