@@ -1,4 +1,5 @@
 #include <bits/stdc++.h>
+#include <mutex>
 using namespace std;
 
 class product{
@@ -245,9 +246,13 @@ enum class S_type{ // enum class for the strategies
 // coupon manager
 class CouponManager{ // will have 1..* relation with coupon class.
     coupon* head;
+    static CouponManager* instance;
+    mutable mutex mtx; 
+
     //mutex mtx; // for thread safe things.
 public:
     void registerCoupon(coupon* c){ 
+        
 
 
 
