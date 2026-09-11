@@ -174,14 +174,21 @@ public:
     }
     virtual double getDiscount(cart* c)=0;
     virtual bool isApplicable(cart* c)=0;
-    virtual bool isCimbinable(cart* c){
+    virtual bool isCombinable(){
         return true;
     }
     virtual string name()=0;
     void applyDiscount(cart* c){
         if(isApplicable(c)){
             double discount = getDiscount(c);
-
+            c->applyDiscount(discount);
+            std::cout<< " applied : "<< discount <<std::endl;
+            if(isCombinable()){
+                return;
+            }
+        }
+        if(next){
+            next->applyDiscount(c);
         }
 
     }
@@ -190,9 +197,18 @@ public:
 
 class BankingCoupon : public coupon{
     string bank;
-    double minSpend,percent,off; // this is where the persent with cap will be used.
+    double minSpend,percent,offcap; // this is where the persent with cap will be used.
     DiscountStrategy* ds;
 public:
+    BankingCoupon(string bnk,double minS,double Pre,double OffC,DiscountStrategy* ds){
+        bank = bnk;
+        minSpend= minS;
+        percent= Pre;
+        offcap= OffC;
+        this->ds =ds;
+        strat = DiscountStrategyManager::getInstance()->getStrategy(StrategyType::PERCENT_WITH_CAP, percent, offCap);
+        //--------------------------------------------------- will be back here;
+    }
     bool isApplicable(cart* c) override{
         return (c->get_payment_bank()==bank);
     }
@@ -242,9 +258,41 @@ public:
 enum class S_type{ // enum class for the strategies
     FLAT,
     PERCENT,
-    DISOCUNT,
     PERWITHUPPERCAP,
     PERWITHCAP
+};
+// DiscountStrategyManager 
+class DiscountStrategyManager{
+private:
+    static DiscountStrategyManager* instance;
+    //When static is used for a data member inside a class, that member belongs to the class itself, rather than to each individual object.
+    DiscountStrategyManager() {}
+    DiscountStrategyManager(const DiscountStrategyManager&)= delete; //It disables the copy constructor.
+    // const - A reference to a DiscountStrategyManager that cannot be modified through this reference;
+    // what does "=delete mean" - This function exists, but the programmer explicitly forbids its use.
+    DiscountStrategyManager& operator = (const DiscountStrategyManager&) =delete; // It disables the copy assignment operator
+public:
+    static DiscountStrategyManager* getInstance(){
+        if(!instance){
+            instance = new DiscountStrategyManager;
+        }
+        return instance;
+    }
+    DiscountStrategy* getStragegy(S_type type, double para1, double para2=0.0) const { //This member function promises not to modify the object on which it is called.
+        if(type ==S_type::FLAT){
+            return new flatDiscountStrategy(para1); 
+        }
+        if(type ==S_type::PERCENT){
+            return new PercentDiscountStrategy(para1); 
+        }
+        if(type ==S_type::PERWITHCAP){
+            return new PercenWithCapDiscountStrategy(para1,para2); 
+        }
+        if(type ==S_type::PERWITHUPPERCAP){
+            return new PercenWithUpperCapDiscountStrategy(para1,para2); 
+        }
+    }
+
 };
 // coupon manager
 class CouponManager{ // will have 1..* relation with coupon class.
@@ -286,11 +334,17 @@ public:
     }
     double Apply_All(cart* c){
         if(head){
-            head->applyDiscount();
+            head->applyDiscount(c);
 
         }
         return c->get_finalTotal();
 
+    }
+    static CouponManager* getInstance(){
+        if(!instance){
+            instance= new CouponManager;
+        }
+        return instance;    
     }
 
 };
@@ -300,9 +354,9 @@ CouponManager* CouponManager::instance = nullptr;
 
 int main(){
     CouponManager* mgr = CouponManager::getInstance();
-    mgr->registerCoupon(new SeasonalOffer(10, "Clothing"));
-    mgr->registerCoupon(new LoyaltyDiscount(5));
-    mgr->registerCoupon(new BulkPurchaseDiscount(1000, 100));
+    mgr->registerCoupon(new SeasonalCoupon(10, "Clothing"));
+    mgr->registerCoupon(new loyaltyDiscount(5));
+    mgr->registerCoupon(new BulkPurchaseCoupon(1000, 100));
     mgr->registerCoupon(new BankingCoupon("ABC", 2000, 15, 500));
 
     Product* p1 = new Product("Winter Jacket", "Clothing", 1000);
