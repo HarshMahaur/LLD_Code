@@ -2,6 +2,7 @@
 #include <mutex>
 using namespace std;
 
+
 class product{
     string name;
     string category;
@@ -44,15 +45,23 @@ class cart{
     double finalTotal; // like current total;
     string payment_bank; // added later.
 public:
+    cart(){
+        originalTotal=0.0;
+        finalTotal=0.0;
+        loyalityMember=false;
+        payment_bank="";
+    }
+
     string get_payment_bank(){
         return payment_bank;
     }
     double get_originalTotal(){
-        double total{0};
-        for(auto c: item){
-            total+=c->get_price();
-        }
-        originalTotal= total;
+        // the below would not be needed coz we calculating to originaltotal hand in hand while adding the product;
+        // double total{0};
+        // for(auto c: item){
+        //     total+=c->get_price();
+        // }
+        // originalTotal= total;
         return originalTotal;
     }
     double get_finalTotal(){
@@ -64,7 +73,16 @@ public:
     void addPDT(product* p,int q){
         cartItem* newcart = new cartItem(p,q);
         item.push_back(newcart); 
+        originalTotal+= newcart->get_price();
+        finalTotal+= newcart->get_price();
     }
+    void setLoyalityMember(bool num){
+        loyalityMember=num;
+    }
+    void setPaymentBank(string bnk){
+        payment_bank = bnk;
+    }
+
 
     vector<cartItem*> get_iten_list(){
         return item;
@@ -154,6 +172,51 @@ public:
     
 };
 
+//-------------------------------------------------------------------------
+// these class needed to be defined before the code actually calls them
+// ENUM class;
+enum class S_type{ // enum class for the strategies
+    FLAT,
+    PERCENT,
+    PERWITHUPPERCAP,
+    PERWITHCAP
+};
+// DiscountStrategyManager 
+class DiscountStrategyManager{
+private:
+    static DiscountStrategyManager* instance;
+    //When static is used for a data member inside a class, that member belongs to the class itself, rather than to each individual object.
+    DiscountStrategyManager() {}
+    DiscountStrategyManager(const DiscountStrategyManager&)= delete; //It disables the copy constructor.
+    // const - A reference to a DiscountStrategyManager that cannot be modified through this reference;
+    // what does "=delete mean" - This function exists, but the programmer explicitly forbids its use.
+    DiscountStrategyManager& operator = (const DiscountStrategyManager&) =delete; // It disables the copy assignment operator
+public:
+    static DiscountStrategyManager* getInstance(){
+        if(!instance){
+            instance = new DiscountStrategyManager;
+        }
+        return instance;
+    }
+    DiscountStrategy* getStrategy(S_type type, double para1, double para2=0.0) const { //This member function promises not to modify the object on which it is called.
+        if(type ==S_type::FLAT){
+            return new flatDiscountStrategy(para1); 
+        }
+        if(type ==S_type::PERCENT){
+            return new PercentDiscountStrategy(para1); 
+        }
+        if(type ==S_type::PERWITHCAP){
+            return new PercenWithCapDiscountStrategy(para1,para2); 
+        }
+        if(type ==S_type::PERWITHUPPERCAP){
+            return new PercenWithUpperCapDiscountStrategy(para1,para2); 
+        }
+    }
+
+};
+DiscountStrategyManager* DiscountStrategyManager::instance = nullptr; //initializeing the static member.
+//-------------------------------------------------------------------------
+
 // now the coupon class that will serve as the bridge bw the discount strat and cart
 class coupon{
     coupon* next;
@@ -200,30 +263,50 @@ class BankingCoupon : public coupon{
     double minSpend,percent,offcap; // this is where the persent with cap will be used.
     DiscountStrategy* ds;
 public:
-    BankingCoupon(string bnk,double minS,double Pre,double OffC,DiscountStrategy* ds){
+    BankingCoupon(string bnk,double minS,double Pre,double OffC){
         bank = bnk;
         minSpend= minS;
         percent= Pre;
         offcap= OffC;
         this->ds =ds;
-        strat = DiscountStrategyManager::getInstance()->getStrategy(StrategyType::PERCENT_WITH_CAP, percent, offCap);
-        //--------------------------------------------------- will be back here;
+        ds = DiscountStrategyManager::getInstance()->getStrategy(S_type::PERWITHUPPERCAP, percent, offcap);
+
     }
     bool isApplicable(cart* c) override{
-        return (c->get_payment_bank()==bank);
+        return (c->get_payment_bank()==bank && c->get_originalTotal()>=minSpend);
     }
-    
+    double getDiscount(cart* c) override{
+        return ds->calculate(c->get_originalTotal());
+    }
+    string name() override{
+        return bank + " Bank Rs " + to_string((int)percent) + " off upto " + to_string((int) offcap);
+
+    }
+    ~BankingCoupon(){
+        delete ds;
+    }
     
 };
 class loyaltyDiscount : public coupon{
     double percent{0};
-    
-    DiscountStrategy* ds;
+    DiscountStrategy* ds; // ds = disocunt strategy
 public:
+    loyaltyDiscount(double pct){
+        percent=pct;
+        ds =  DiscountStrategyManager::getInstance()->getStrategy(S_type::PERCENT,pct);
+    }
+    ~loyaltyDiscount(){
+        delete ds;
+    }
     bool isApplicable(cart* c) override{
         return c->get_loyality_Member();
     }
-    
+    double getDiscount(cart* c) override{
+        return ds->calculate(c->get_originalTotal());
+    }   
+    string name() override{
+        return "Loyalty Discount " + to_string((int)percent) + "% off";
+    }
     
     
 };
@@ -232,10 +315,25 @@ class BulkPurchaseCoupon : public coupon{
     double flatoff{0};
     DiscountStrategy* ds;
 public:
-    bool isApplicable(cart* c){
+    BulkPurchaseCoupon(double th,double fltoff){
+        threshold = th;
+        flatoff= fltoff;
+        ds= DiscountStrategyManager::getInstance()->getStrategy(S_type::FLAT,fltoff);
+    }
+    ~BulkPurchaseCoupon(){
+        delete ds;
+    }
+    bool isApplicable(cart* c) override{
         double amt = c->get_originalTotal();
         return amt>=threshold;
     }
+    double getDiscount(cart* c) override{
+        return ds->calculate(c->get_originalTotal());
+    }
+    string name() override{
+        return "Bulk Purchase Rs " + to_string((int)flatoff) + " off over "+ to_string((int)threshold);
+    }
+
     
 };
 class SeasonalCoupon : public coupon{
@@ -243,6 +341,14 @@ class SeasonalCoupon : public coupon{
     double percent;
     DiscountStrategy* ds;
 public:
+    SeasonalCoupon(double pct, string cat){
+        percent= pct;
+        catagory = cat;
+        ds = DiscountStrategyManager::getInstance()->getStrategy(S_type::PERCENT, percent);
+    }
+    ~SeasonalCoupon(){
+        delete ds;
+    }
     bool isApplicable(cart* c){
         for(cartItem* item : c->get_iten_list()){
             if(item->get_product()->get_category()==catagory){
@@ -251,49 +357,25 @@ public:
         }
         return false;
     }
+    double getDiscount(cart* c) override{
+        double subtotal; // to apply this discount only on the item belong to "catagory"
+        for( auto item : c->get_iten_list()){
+            if(item->get_product()->get_category()==catagory){
+                subtotal += item->get_price();
 
-};
-
-// ENUM class;
-enum class S_type{ // enum class for the strategies
-    FLAT,
-    PERCENT,
-    PERWITHUPPERCAP,
-    PERWITHCAP
-};
-// DiscountStrategyManager 
-class DiscountStrategyManager{
-private:
-    static DiscountStrategyManager* instance;
-    //When static is used for a data member inside a class, that member belongs to the class itself, rather than to each individual object.
-    DiscountStrategyManager() {}
-    DiscountStrategyManager(const DiscountStrategyManager&)= delete; //It disables the copy constructor.
-    // const - A reference to a DiscountStrategyManager that cannot be modified through this reference;
-    // what does "=delete mean" - This function exists, but the programmer explicitly forbids its use.
-    DiscountStrategyManager& operator = (const DiscountStrategyManager&) =delete; // It disables the copy assignment operator
-public:
-    static DiscountStrategyManager* getInstance(){
-        if(!instance){
-            instance = new DiscountStrategyManager;
+            }
         }
-        return instance;
+        return ds->calculate(subtotal);
     }
-    DiscountStrategy* getStragegy(S_type type, double para1, double para2=0.0) const { //This member function promises not to modify the object on which it is called.
-        if(type ==S_type::FLAT){
-            return new flatDiscountStrategy(para1); 
-        }
-        if(type ==S_type::PERCENT){
-            return new PercentDiscountStrategy(para1); 
-        }
-        if(type ==S_type::PERWITHCAP){
-            return new PercenWithCapDiscountStrategy(para1,para2); 
-        }
-        if(type ==S_type::PERWITHUPPERCAP){
-            return new PercenWithUpperCapDiscountStrategy(para1,para2); 
-        }
+    bool isCombinable() override{
+        return true;
+    }
+    string name() override {
+        return "Seasonal Offer " + to_string((int)percent) + " % off " + catagory;
     }
 
 };
+
 // coupon manager
 class CouponManager{ // will have 1..* relation with coupon class.
     coupon* head;
@@ -319,7 +401,7 @@ public:
         }
 
     }
-    vector<string> isApplicable(cart* crt){
+    vector<string> setApplicable(cart* crt){
         // lock_guard<mutex> lock(mtx);
         vector<string> res;
         coupon* curr = head;
@@ -359,30 +441,30 @@ int main(){
     mgr->registerCoupon(new BulkPurchaseCoupon(1000, 100));
     mgr->registerCoupon(new BankingCoupon("ABC", 2000, 15, 500));
 
-    Product* p1 = new Product("Winter Jacket", "Clothing", 1000);
-    Product* p2 = new Product("Smartphone", "Electronics", 20000);
-    Product* p3 = new Product("Jeans", "Clothing", 1000);
-    Product* p4 = new Product("Headphones", "Electronics", 2000);
+    product* p1 = new product("Winter Jacket", "Clothing", 1000);
+    product* p2 = new product("Smartphone", "Electronics", 20000);
+    product* p3 = new product("Jeans", "Clothing", 1000);
+    product* p4 = new product("Headphones", "Electronics", 2000);
 
-    Cart* cart = new Cart();
-    cart->addProduct(p1, 1);
-    cart->addProduct(p2, 1);
-    cart->addProduct(p3, 2);
-    cart->addProduct(p4, 1);
-    cart->setLoyaltyMember(true);
-    cart->setPaymentBank("ABC");
+    cart* crt = new cart();
+    crt->addPDT(p1, 1);
+    crt->addPDT(p2, 1);
+    crt->addPDT(p3, 2);
+    crt->addPDT(p4, 1);
+    crt->setLoyalityMember(true);
+    crt->setPaymentBank("ABC");
 
-    cout << "Original Cart Total: " << cart->getOriginalTotal() << " Rs" << endl;
+    cout << "Original Cart Total: " << crt->get_originalTotal() << " Rs" << endl;
 
 
 
-    vector<string> applicable = mgr->getApplicable(cart);
+    vector<string> applicable = mgr->setApplicable(crt);
     cout << "Applicable Coupons:" << endl;
     for (string name : applicable) {
         cout << " - " << name << endl;
     }
 
-    double finalTotal = mgr->applyAll(cart);
+    double finalTotal = mgr->Apply_All(crt);
     cout << "Final Cart Total after discounts: " << finalTotal << " Rs" << endl;
 
     // Cleanup code
@@ -390,7 +472,7 @@ int main(){
     delete p2;
     delete p3;
     delete p4;
-    delete cart;
+    delete crt;
 
 
 
