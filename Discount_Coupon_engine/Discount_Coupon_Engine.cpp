@@ -9,7 +9,7 @@ class product{
     double price;
 public:
     product(string n,string cat, double p){
-        name = name;
+        name = n;
         category= cat;
         price= p;
     }
@@ -89,7 +89,7 @@ public:
     }
 
     void applyDiscount(double amt){ // this amt the final amt that we will get after applying the coupons on th original amount
-        finalTotal= amt; // the work of calculation will be done by coupons(class).
+        finalTotal-= amt; // the work of calculation will be done by coupons(class).
     }
     ~cart(){
         for(auto c: item){
@@ -145,7 +145,7 @@ public:
             std::cout<< "you are short on base amount you need item of Rs."<<Amtcap-amount<<" in your cart for this coupon to be applicable" <<std::endl;
             return 0;
         }
-        return ((amount*percent)/100);
+        return min((amount * percent) / 100, Amtcap);
         
 
 
@@ -246,7 +246,7 @@ public:
             double discount = getDiscount(c);
             c->applyDiscount(discount);
             std::cout<< " applied : "<< discount <<std::endl;
-            if(isCombinable()){
+            if(!isCombinable()){
                 return;
             }
         }
@@ -358,7 +358,7 @@ public:
         return false;
     }
     double getDiscount(cart* c) override{
-        double subtotal; // to apply this discount only on the item belong to "catagory"
+        double subtotal=0; // to apply this discount only on the item belong to "catagory"
         for( auto item : c->get_iten_list()){
             if(item->get_product()->get_category()==catagory){
                 subtotal += item->get_price();
